@@ -389,6 +389,15 @@ class Explore:
     def _check_connection(self):
         assert self.is_connected, "Explore device is not connected. Please connect the device first."
 
+    def set_test_sig(self, channel_mask):
+        """
+        """
+        if not isinstance(channel_mask, int):
+            raise TypeError("Input must be an integer!")
+        self._check_connection()
+        cmd = SetChTest(channel_mask)
+        self.stream_processor.configure_device(cmd)
+
     @staticmethod
     def _check_duration(duration):
         if duration:
