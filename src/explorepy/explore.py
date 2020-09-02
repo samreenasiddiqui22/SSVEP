@@ -22,7 +22,7 @@ import numpy as np
 
 import explorepy
 from explorepy.tools import create_exg_recorder, create_orn_recorder, create_marker_recorder, LslServer, PhysicalOrientation
-from explorepy.command import MemoryFormat, SetSPS, SoftReset, SetCh, ModuleDisable, ModuleEnable
+from explorepy.command import MemoryFormat, SetSPS, SoftReset, SetCh, ModuleDisable, ModuleEnable, SetChTest
 from explorepy.stream_processor import StreamProcessor, TOPICS
 
 
