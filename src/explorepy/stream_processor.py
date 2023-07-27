@@ -2,10 +2,14 @@
 """Stream Processor module
 This module is responsible for processing incoming stream from Explore device and publishing data to subscribers.
 """
+import collections
 import logging
 import time
 from enum import Enum
 from threading import Lock
+
+import numpy as np
+from pylsl import local_clock
 
 from explorepy.command import (
     DeviceConfiguration,
@@ -26,7 +30,8 @@ from explorepy.packet import (
     ExternalMarker,
     Orientation,
     PacketBIN,
-    SoftwareMarker
+    SoftwareMarker,
+    TriggerIn
 )
 from explorepy.parser import Parser
 from explorepy.settings_manager import SettingsManager
@@ -63,6 +68,7 @@ class StreamProcessor:
         self._last_packet_rcv_time = 0
         self.is_bt_streaming = True
         self.debug = debug
+        self.trigger_in_packets = collections.deque([0,0], maxlen=2)
 
     def subscribe(self, callback, topic):
         """Subscribe a function to a topic
@@ -158,6 +164,9 @@ class StreamProcessor:
         elif isinstance(packet, Environment):
             self.dispatch(topic=TOPICS.env, packet=packet)
         elif isinstance(packet, EventMarker):
+            if isinstance(packet, TriggerIn):
+                self.monitor_trigger_in(packet, 1.5)
+                return
             self.dispatch(topic=TOPICS.marker, packet=packet)
         elif isinstance(packet, CalibrationInfo) or isinstance(packet, CalibrationInfo_USBC):
             self.imp_calib_info = packet.get_info()
@@ -324,3 +333,27 @@ class StreamProcessor:
     def send_timestamp(self):
         """Send host timestamp to the device"""
         self._device_configurator.send_timestamp()
+
+    def monitor_trigger_in(self, trigger_packet, duration):
+        # start_time = local_clock()
+        # # print("start time is {}".format(start_time))
+        # while local_clock() - start_time <= duration:
+        #     pass
+        # if self.trigger_in_packets[1] == trigger_packet.timestamp:
+        #     self.dispatch(TOPICS.marker, trigger_packet)
+
+        self.trigger_in_packets.append(trigger_packet.timestamp)
+        trigger_pulse_offset = self.trigger_in_packets[1] - self.trigger_in_packets[0]
+
+        if trigger_pulse_offset <= .1:
+            trigger_packet.timestamp = self.trigger_in_packets[0]
+            trigger_packet.code = int(((trigger_pulse_offset) * 100) % 100)
+            self.dispatch(TOPICS.marker, trigger_packet)
+        else:
+            from threading import Timer
+            timer = Timer(.110, self.send_trigger_in, [trigger_packet])
+            timer.start()
+
+    def send_trigger_in(self, trigger_in_packet):
+        if self.trigger_in_packets[1] == trigger_in_packet.timestamp:
+            self.dispatch(TOPICS.marker, trigger_in_packet)
