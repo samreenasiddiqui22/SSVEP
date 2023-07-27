@@ -6,8 +6,10 @@ import collections
 import logging
 import time
 from enum import Enum
-from threading import Lock
-
+from threading import (
+    Lock,
+    Timer
+)
 import numpy as np
 from pylsl import local_clock
 
@@ -68,7 +70,7 @@ class StreamProcessor:
         self._last_packet_rcv_time = 0
         self.is_bt_streaming = True
         self.debug = debug
-        self.trigger_in_packets = collections.deque([0,0], maxlen=2)
+        self.trigger_in_packets = collections.deque(maxlen=8)
 
     def subscribe(self, callback, topic):
         """Subscribe a function to a topic
@@ -342,18 +344,21 @@ class StreamProcessor:
         # if self.trigger_in_packets[1] == trigger_packet.timestamp:
         #     self.dispatch(TOPICS.marker, trigger_packet)
 
-        self.trigger_in_packets.append(trigger_packet.timestamp)
-        trigger_pulse_offset = self.trigger_in_packets[1] - self.trigger_in_packets[0]
-
-        if trigger_pulse_offset <= .1:
-            trigger_packet.timestamp = self.trigger_in_packets[0]
-            trigger_packet.code = int(((trigger_pulse_offset) * 100) % 100)
-            self.dispatch(TOPICS.marker, trigger_packet)
-        else:
-            from threading import Timer
-            timer = Timer(.110, self.send_trigger_in, [trigger_packet])
+        self.trigger_in_packets.append(trigger_packet)
+        if len(self.trigger_in_packets) == 1:
+            timer = Timer(.1, self.send_trigger_in)
             timer.start()
 
-    def send_trigger_in(self, trigger_in_packet):
-        if self.trigger_in_packets[1] == trigger_in_packet.timestamp:
-            self.dispatch(TOPICS.marker, trigger_in_packet)
+        #self.dispatch(TOPICS.marker, trigger_packet)
+
+
+    def send_trigger_in(self):
+        trigger_bit = 0
+        for i in range(1, len(self.trigger_in_packets)):
+            offset_trigger = -1 * np.round(self.trigger_in_packets[0].timestamp - self.trigger_in_packets[i].timestamp, 2)
+            n = int((offset_trigger * 100) % 100)
+            trigger_bit |= 1 << (n - 1)
+        self.trigger_in_packets[0].code = trigger_bit
+        self.dispatch(TOPICS.marker, self.trigger_in_packets[0])
+        self.trigger_in_packets.clear()
+
