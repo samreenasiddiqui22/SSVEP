@@ -353,12 +353,15 @@ class StreamProcessor:
 
 
     def send_trigger_in(self):
-        trigger_bit = 0
+        trigger_byte = 0
+        last_set_bit = 0
         for i in range(1, len(self.trigger_in_packets)):
-            offset_trigger = -1 * np.round(self.trigger_in_packets[0].timestamp - self.trigger_in_packets[i].timestamp, 2)
-            n = int((offset_trigger * 100) % 100)
-            trigger_bit |= 1 << (n - 1)
-        self.trigger_in_packets[0].code = trigger_bit
+            offset_trigger = np.round(self.trigger_in_packets[i].timestamp - self.trigger_in_packets[i - 1].timestamp, 3)
+            # 10ms is the minimum trigger interval, triggers should be sent in 2ms interval starting from 12ms
+            n = int(((offset_trigger * 1000) % 1000) - 10)
+            last_set_bit += int (n / 2)
+            trigger_byte |= 1 << int (last_set_bit -1)
+        self.trigger_in_packets[0].code = trigger_byte
         self.dispatch(TOPICS.marker, self.trigger_in_packets[0])
         self.trigger_in_packets.clear()
 
