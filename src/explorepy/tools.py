@@ -778,23 +778,42 @@ class PhysicalOrientation:
         packet.mag[1] = self.calibre_set[1] * (packet.mag[1] - self.calibre_set[4])
         packet.mag[2] = self.calibre_set[2] * (packet.mag[2] - self.calibre_set[5])
         mag = packet.mag
+
+        mag = mag / (np.dot(mag, mag) ** 0.5) # added
+
         D = acc
+
         dD = D - self.ED_prv[1]
         da = np.cross(self.ED_prv[1], dD)
-        E = -1 * np.cross(D, mag)
+
+        E = np.cross(D, mag)
         E = E / (np.dot(E, E) ** 0.5)
+
         dE = E - self.ED_prv[0]
         dm = np.cross(self.ED_prv[0], dE)
+
         dg = 0.05 * gyro
+
         dth = -0.95 * dg + 0.025 * da + 0.025 * dm
+
         D = self.ED_prv[1] + np.cross(dth, self.ED_prv[1])
         D = D / (np.dot(D, D) ** 0.5)
+
+        E = self.ED_prv[0] + np.cross(dth, self.ED_prv[0])
+        E = E / (np.dot(E, E) ** 0.5)
+
         Err = np.dot(D, E)
+
         D_tmp = D - 0.5 * Err * E
         E_tmp = E - 0.5 * Err * D
+
         D = D_tmp / (np.dot(D_tmp, D_tmp) ** 0.5)
         E = E_tmp / (np.dot(E_tmp, E_tmp) ** 0.5)
-        N = -1 * np.cross(E, D)
+
+        self.ED_prv[0] = E
+        self.ED_prv[1] = D
+
+        N = np.cross(E, D)
         N = N / (np.dot(N, N) ** 0.5)
         '''
         If you comment this block it will give you the absolute orientation based on {East,North,Up} coordinate system.
@@ -802,26 +821,60 @@ class PhysicalOrientation:
         So, it is important to keep the device steady, so that the device can capture the initial direction properly.
         '''
         ##########################
+        #T = np.zeros((3, 3))
+        #[T_init, N_init, E_init, D_init] = self.init_set
+        #T = np.column_stack((E, N, D))
+        #T_test = np.matmul(T, T_init.transpose())
+        #N = np.matmul(T_test.transpose(), N_init)
+        #E = np.matmul(T_test.transpose(), E_init)
+        #D = np.matmul(T_test.transpose(), D_init)
+        ##########################
+
+        # gonna add this myself
         T = np.zeros((3, 3))
-        [T_init, N_init, E_init, D_init] = self.init_set
-        T = np.column_stack((E, N, D))
+        T[0][0] = N[0]
+        T[0][1] = E[0]
+        T[0][2] = D[0]
+
+        T[1][0] = N[1]
+        T[1][1] = E[1]
+        T[1][2] = D[1]
+
+        T[2][0] = N[2]
+        T[2][1] = E[2]
+        T[2][2] = D[2]
+
+        T_init = self.init_set[0]
+        N_init = self.init_set[1]
+        E_init = self.init_set[2]
+        D_init = self.init_set[3]
+
         T_test = np.matmul(T, T_init.transpose())
         N = np.matmul(T_test.transpose(), N_init)
         E = np.matmul(T_test.transpose(), E_init)
         D = np.matmul(T_test.transpose(), D_init)
-        ##########################
-        matrix = np.identity(3)
-        matrix = np.column_stack((E, N, D))
-        N = N / (np.dot(N, N) ** 0.5)
-        E = E / (np.dot(E, E) ** 0.5)
-        D = D / (np.dot(D, D) ** 0.5)
-        self.ED_prv = [E, D]
-        self.matrix = self.matrix * 0.9 + 0.1 * matrix
+
+        matrix = np.identity(4)
+        matrix[0][0] = N[0]
+        matrix[0][1] = E[0]
+        matrix[0][2] = D[0]
+
+        matrix[1][0] = N[1]
+        matrix[1][1] = E[1]
+        matrix[1][2] = D[1]
+
+        matrix[2][0] = N[2]
+        matrix[2][1] = E[2]
+        matrix[2][2] = D[2]
+
+        self.matrix = matrix
+
         [theta, rot_axis] = packet.compute_angle(matrix=self.matrix)
         self.theta = self.theta * 0.9 + 0.1 * theta
         packet.theta = self.theta
         self.axis = self.axis * 0.9 + 0.1 * rot_axis
         packet.rot_axis = self.axis
+        packet.matrix = matrix
 
     @staticmethod
     def init_dir():
