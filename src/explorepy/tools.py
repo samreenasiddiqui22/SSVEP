@@ -13,6 +13,7 @@ from threading import Lock
 
 import numpy as np
 import pandas
+import pandas as pd
 import pyedflib
 from appdirs import (
     user_cache_dir,
@@ -927,7 +928,8 @@ def compare_recover_from_bin(file_name_csv, file_name_device):
             file_name_csv (str): Name of recorded csv file without extension
             file_name_device_csv (str): Name of converted csv file
         """
-    bin_df = pandas.read_csv(file_name_device + '_ExG.csv')
+    bin_df_exg = pandas.read_csv(file_name_device + '_ExG.csv')
+    bin_df_marker = pandas.read_csv(file_name_device + '_Marker.csv')
     csv_df = pandas.read_csv(file_name_csv + '_ExG.csv')
     meta_df = pandas.read_csv(file_name_csv + "_Meta.csv")
     timestamp_key = 'TimeStamp'
@@ -938,6 +940,15 @@ def compare_recover_from_bin(file_name_csv, file_name_device):
 
     start = csv_df[timestamp_key][0] - offset_ - time_period
     stop = csv_df[timestamp_key][len(csv_df[timestamp_key]) - 1] - offset_ + time_period
-    bin_df = bin_df[(bin_df[timestamp_key] >= start) & (bin_df[timestamp_key] <= stop)]
-    bin_df[timestamp_key] = bin_df[timestamp_key] + offset_
-    bin_df.to_csv(file_name_csv + '_recovered_ExG.csv', index=False)
+    # recover exg data
+    bin_df_exg = bin_df_exg[(bin_df_exg[timestamp_key] >= start) & (bin_df_exg[timestamp_key] <= stop)]
+    bin_df_exg[timestamp_key] = bin_df_exg[timestamp_key] + offset_
+    bin_df_exg.to_csv(file_name_csv + '_recovered_ExG.csv', index=False)
+    # recover marker data, first read pc marker file
+    df_marker_online = pandas.read_csv(file_name_csv + '_Marker.csv')
+    df_marker_online = df_marker_online[df_marker_online['Code'].str.contains('sw_')]
+    bin_df_marker = bin_df_marker[(bin_df_marker[timestamp_key] >= start) & (bin_df_marker[timestamp_key] <= stop)]
+    bin_df_marker[timestamp_key] = bin_df_marker[timestamp_key] + offset_
+    # merge two data frames and sort by timestamp
+    bin_df_marker= pd.concat([bin_df_marker, df_marker_online], sort=False).sort_values(by=['TimeStamp'])
+    bin_df_marker.to_csv(file_name_csv + '_recovered_Marker.csv', index=False)
