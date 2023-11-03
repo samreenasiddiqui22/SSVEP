@@ -16,8 +16,8 @@ from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
 EEG_SERVICE_UUID = "FFFE0001-B5A3-F393-E0A9-E50E24DCCA9E"
-EEG_RX_CHAR_UUID = "FFFE0003-B5A3-F393-E0A9-E50E24DCCA9E"
-EEG_TX_CHAR_UUID = "FFFE0002-B5A3-F393-E0A9-E50E24DCCA9E"
+EEG_TX_CHAR_UUID = "FFFE0003-B5A3-F393-E0A9-E50E24DCCA9E"
+EEG_RX_CHAR_UUID = "FFFE0002-B5A3-F393-E0A9-E50E24DCCA9E"
 
 
 
@@ -56,6 +56,7 @@ async def eeg_explorer():
             task.cancel()
 
     def handle_rx(_: BleakGATTCharacteristic, data: bytearray):
+        print("len:", len(data))
         print("received:", data)
 
     async with BleakClient(device, disconnected_callback=handle_disconnect) as client:
