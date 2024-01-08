@@ -14,7 +14,6 @@ log_config.log_breadcrumb(f"OS: {platform.platform()} - {sys.version}", "info")
 
 from . import (  # noqa ignore E402
     command,
-    exploresdk,
     tools
 )
 from .dashboard.dashboard import Dashboard  # noqa
